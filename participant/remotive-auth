@@ -1,0 +1,58 @@
+# RemotiveCloud authentication for the hackathon — use INSTEAD of interactive login.
+#
+# The RemotiveCLI and RemotiveBroker only accept a service account via the
+# REMOTIVE_CLOUD_AUTH_TOKEN env var (confirmed: 'remotive cloud auth activate <file>'
+# does not accept a raw service-account token file — it is for personal login tokens).
+# A plain shell export only lives in the current shell, so this script sets the token in
+# every place a command might run from:
+#
+#   1. This shell, right now (immediate effect).
+#   2. ~/.ssh/environment — sshd injects this into EVERY SSH session it creates,
+#      interactive AND non-interactive (e.g. `ssh host 'remotive ...'`, which is how
+#      Remote-SSH tools like Kiro IDE / VS Code run commands). Requires the AMI to have
+#      `PermitUserEnvironment yes` (baked in by provision.sh) — no participant sudo needed
+#      to write this file, it's the user's own.
+#   3. /etc/environment — best-effort, only if passwordless sudo is available. Covers
+#      non-SSH sessions (e.g. a NICE DCV desktop terminal on this box), which ~/.ssh/environment
+#      does not reach. Skipped silently if sudo needs a password.
+#
+# Usage: source ~/remotive-auth   (reads service-account.json next to this file)
+#
+# NOTE: service-account.json contains a real (scoped, time-limited) credential that is
+# intentionally committed for zero-setup. Keep this repo PRIVATE and rotate the token
+# per event.
+
+if [ -n "${BASH_SOURCE:-}" ]; then
+  _ra_here="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
+else
+  _ra_here="$HOME"
+fi
+_ra_sa="${_ra_here}/service-account.json"
+
+if [ -f "${_ra_sa}" ]; then
+  _ra_token="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["token"])' "${_ra_sa}" 2>/dev/null)"
+  if [ -n "${_ra_token}" ]; then
+    # 1) current shell
+    export REMOTIVE_CLOUD_AUTH_TOKEN="${_ra_token}"
+    export REMOTIVE_CLOUD_ORGANIZATION="remotivelabs"
+
+    # 2) ~/.ssh/environment — every SSH session (interactive + non-interactive)
+    mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh"
+    { echo "REMOTIVE_CLOUD_AUTH_TOKEN=${_ra_token}"; echo "REMOTIVE_CLOUD_ORGANIZATION=remotivelabs"; } \
+      > "$HOME/.ssh/environment"
+    chmod 600 "$HOME/.ssh/environment"
+
+    # 3) /etc/environment — best-effort, only with passwordless sudo (covers DCV/console)
+    if sudo -n true 2>/dev/null; then
+      sudo sed -i '/^REMOTIVE_CLOUD_AUTH_TOKEN=/d;/^REMOTIVE_CLOUD_ORGANIZATION=/d' /etc/environment 2>/dev/null
+      { echo "REMOTIVE_CLOUD_AUTH_TOKEN=${_ra_token}"; echo "REMOTIVE_CLOUD_ORGANIZATION=remotivelabs"; } \
+        | sudo tee -a /etc/environment >/dev/null 2>&1
+    fi
+
+    if [ -n "${REMOTIVE_AUTH_VERBOSE:-}" ]; then
+      echo "remotive-auth: service account active; org=remotivelabs (set in this shell, ~/.ssh/environment, and /etc/environment if sudo allowed)"
+    fi
+  fi
+  unset _ra_token
+fi
+unset _ra_here _ra_sa

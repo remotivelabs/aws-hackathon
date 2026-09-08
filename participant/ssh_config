@@ -1,0 +1,41 @@
+# RemotiveTopology hackathon - SSH config (day-1 -> day-2)
+#
+# The RemotiveCar box (day-2) exposes NOTHING publicly except SSH (port 22). You reach
+# every service by forwarding it over this SSH connection so it appears on localhost on
+# your day-1 machine. That is also why RemotiveStudio works cleanly: localhost is a
+# browser "secure context" and is already in Studio's allow-list, so no other setup is
+# needed (and 'remotive studio --desktop' on day-1 can talk to the forwarded broker).
+#
+# SETUP (once, on the day-1 machine):
+#   1) Set HostName below to the day-2 instance's IP (or DNS name).
+#      IdentityFile defaults to ~/.ssh/my-key.pem - adjust if your key is elsewhere.
+#   2) Add ONE line at the top of your ~/.ssh/config:
+#        Include /ABSOLUTE/PATH/TO/aws-hackaton/participant/ssh_config
+#      (Windows: use the full path.)
+#   3) Connect:  ssh remotive-hackathon
+#
+# Once connected, on day-1 open:
+#   RemotiveStudio          http://localhost:57123
+#   Android head unit       https://localhost:8443   (accept the self-signed cert)
+#   3D car                  http://localhost:3000
+#   Topology broker / API   localhost:50051
+#   adb                     adb connect localhost:6520
+#   Jupyter (if an example  http://localhost:8888/lab?token=remotivelabs
+#            exposes it)
+
+Host remotive-hackathon
+    HostName <DAY2_IP>
+    User ubuntu
+    IdentityFile ~/.ssh/my-key.pem
+    IdentitiesOnly yes
+    StrictHostKeyChecking accept-new
+    # Everything travels over SSH - nothing is exposed on day-2 except port 22.
+    LocalForward 57123 localhost:57123   # RemotiveStudio
+    LocalForward 50051 localhost:50051   # topology broker / API
+    LocalForward 8443  localhost:8443    # Android head unit (Cuttlefish)
+    LocalForward 3000  localhost:3000    # 3D car
+    LocalForward 6520  localhost:6520    # adb
+    LocalForward 8888  localhost:8888    # Jupyter (optional, if an example exposes it)
+    # Keep the connection alive during long builds / Android boot
+    ServerAliveInterval 30
+    ServerAliveCountMax 6

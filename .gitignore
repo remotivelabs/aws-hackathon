@@ -1,0 +1,10 @@
+# Private keys / secrets — never commit
+*.pem
+*.key
+*.p12
+.env
+*.env
+
+# OS / editor noise
+.DS_Store
+*.swp

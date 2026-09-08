@@ -1,0 +1,77 @@
+{
+  "schema": "remotive-dashboard:0.2",
+  "panels": [
+    {
+      "type": "video",
+      "grid": {
+        "x": 0,
+        "y": 0,
+        "w": 6,
+        "h": 6
+      },
+      "content": {
+        "videoName": "front",
+        "videoFilePath": "./m_drive_2025-07-30/front.mp4",
+        "recordingSessionPath": "/tesla.recordingsession.yaml"
+      }
+    },
+    {
+      "type": "signal-value-timeseries",
+      "settings": {
+        "useSuggestedMinMax": false,
+        "yAxisSettings": {
+          "showDecimal": true,
+          "showHex": false,
+          "showNamed": true
+        },
+        "syncChart": true,
+        "chartWidthSeconds": 30,
+        "maxFps": 60
+      },
+      "grid": {
+        "x": 6,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "content": {
+        "signals": [
+          {
+            "namespace": "topology-ChassisCan0",
+            "frame": "UISpeedFrame",
+            "signal": "UISpeedFrame.uispeed"
+          },
+          {
+            "namespace": "topology-BodyCan0",
+            "frame": "TurnLightControl",
+            "signal": "TurnLightControl.LeftTurnLightRequest"
+          }
+        ]
+      }
+    },
+    {
+      "type": "frameDistribution",
+      "grid": {
+        "x": 6,
+        "y": 4,
+        "w": 6,
+        "h": 7
+      }
+    },
+    {
+      "type": "video",
+      "grid": {
+        "x": 0,
+        "y": 6,
+        "w": 6,
+        "h": 6
+      },
+      "content": {
+        "videoName": "rear",
+        "videoFilePath": "./m_drive_2025-07-30/back.mp4",
+        "recordingSessionPath": "/tesla.recordingsession.yaml"
+      }
+    }
+  ],
+  "name": "drive"
+}
