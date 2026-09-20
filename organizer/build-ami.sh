@@ -14,18 +14,39 @@
 #   SECURITY_GROUP_ID=sg-xxxx SUBNET_ID=subnet-xxxx \
 #   ./build-ami.sh
 #
+#   # arm64 (Graviton) variant - "Arm on Arm", the architecture a real car runs:
+#   ARCH=arm64 AWS_REGION=eu-central-1 KEY_NAME=... KEY_FILE=... \
+#   SECURITY_GROUP_ID=sg-xxxx SUBNET_ID=subnet-xxxx \
+#   ./build-ami.sh
+#
+# ARCH only changes the builder: the base Ubuntu image, the default instance type, and
+# whether the nested-virtualization CPU option applies (it is Intel-only). Participants
+# of the arm64 image need a BARE METAL type (c7g.metal) to get /dev/kvm, because
+# virtualized Graviton exposes no nested virtualization - but the build itself does not
+# need KVM, so it runs on a cheap c7g.4xlarge.
+#
 set -euo pipefail
 
 # ---- config (override via env) ----------------------------------------------
 AWS_REGION="${AWS_REGION:-us-east-1}"
-INSTANCE_TYPE="${INSTANCE_TYPE:-c8i.4xlarge}"          # 8th-gen Intel => nested virt
+ARCH="${ARCH:-amd64}"                                  # amd64 | arm64
+case "$ARCH" in
+  amd64) DEFAULT_INSTANCE_TYPE="c8i.4xlarge" ;;        # 8th-gen Intel => nested virt
+  arm64) DEFAULT_INSTANCE_TYPE="c7g.4xlarge" ;;        # Graviton3; build needs no KVM
+  *)     echo "ARCH must be amd64 or arm64, got '$ARCH'" >&2; exit 1 ;;
+esac
+INSTANCE_TYPE="${INSTANCE_TYPE:-$DEFAULT_INSTANCE_TYPE}"
 KEY_NAME="${KEY_NAME:?set KEY_NAME}"
 KEY_FILE="${KEY_FILE:?set KEY_FILE (path to the private key)}"
 SECURITY_GROUP_ID="${SECURITY_GROUP_ID:?set SECURITY_GROUP_ID}"
 SUBNET_ID="${SUBNET_ID:?set SUBNET_ID}"
 ROOT_VOLUME_GB="${ROOT_VOLUME_GB:-100}"
-AMI_NAME="${AMI_NAME:-remotive-topology-hackathon-$(date +%Y%m%d-%H%M%S)}"
-SSM_AMI_PARAM="/aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id"
+if [[ "$ARCH" == "arm64" ]]; then
+  AMI_NAME="${AMI_NAME:-remotive-topology-hackathon-arm64-$(date +%Y%m%d-%H%M%S)}"
+else
+  AMI_NAME="${AMI_NAME:-remotive-topology-hackathon-$(date +%Y%m%d-%H%M%S)}"
+fi
+SSM_AMI_PARAM="/aws/service/canonical/ubuntu/server/24.04/stable/current/${ARCH}/hvm/ebs-gp3/ami-id"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10"
 
@@ -33,21 +54,27 @@ aws() { command aws --region "$AWS_REGION" "$@"; }
 log() { echo -e "\n### $* ###"; }
 
 # ---- resolve base AMI -------------------------------------------------------
-log "Resolving latest Ubuntu 24.04 amd64 AMI"
+log "Resolving latest Ubuntu 24.04 $ARCH AMI"
 BASE_AMI="$(aws ssm get-parameter --name "$SSM_AMI_PARAM" --query 'Parameter.Value' --output text)"
 echo "Base AMI: $BASE_AMI"
 
-# ---- launch builder with nested virtualization enabled ----------------------
-log "Launching builder ($INSTANCE_TYPE, NestedVirtualization=enabled)"
+# ---- launch builder ---------------------------------------------------------
+# NestedVirtualization is an Intel-only CPU option; passing it on Graviton fails the call.
+cpu_args=()
+case "$INSTANCE_TYPE" in
+  c8i.*|m8i.*|r8i.*) cpu_args=(--cpu-options 'NestedVirtualization=enabled') ;;
+esac
+
+log "Launching builder ($INSTANCE_TYPE, $ARCH${cpu_args:+, NestedVirtualization=enabled})"
 BUILDER_ID="$(aws ec2 run-instances \
   --image-id "$BASE_AMI" \
   --instance-type "$INSTANCE_TYPE" \
   --key-name "$KEY_NAME" \
   --security-group-ids "$SECURITY_GROUP_ID" \
   --subnet-id "$SUBNET_ID" \
-  --cpu-options 'NestedVirtualization=enabled' \
+  ${cpu_args[@]+"${cpu_args[@]}"} \
   --block-device-mappings "[{\"DeviceName\":\"/dev/sda1\",\"Ebs\":{\"VolumeSize\":${ROOT_VOLUME_GB},\"VolumeType\":\"gp3\",\"DeleteOnTermination\":true}}]" \
-  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=remotive-ami-builder}]' \
+  --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=remotive-ami-builder-${ARCH}}]" \
   --query 'Instances[0].InstanceId' --output text)"
 echo "Builder instance: $BUILDER_ID"
 
@@ -103,11 +130,17 @@ log "Stopping builder before create-image"
 aws ec2 stop-instances --instance-ids "$BUILDER_ID" >/dev/null
 aws ec2 wait instance-stopped --instance-ids "$BUILDER_ID"
 
+if [[ "$ARCH" == "arm64" ]]; then
+  AMI_DESC='RemotiveTopology hackathon (arm64/Graviton) - Docker, RemotiveCLI+Studio, RemotiveBus, Wireshark, examples repo. For /dev/kvm (Android/Cuttlefish) launch a BARE METAL type such as c7g.metal; no cpu-options needed.'
+else
+  AMI_DESC='RemotiveTopology hackathon - Docker, RemotiveCLI+Studio, RemotiveBus, Wireshark, examples repo + workspace init. Launch with cpu-options NestedVirtualization=enabled.'
+fi
+
 log "Creating AMI: $AMI_NAME"
 AMI_ID="$(aws ec2 create-image \
   --instance-id "$BUILDER_ID" \
   --name "$AMI_NAME" \
-  --description 'RemotiveTopology hackathon - Docker, RemotiveCLI+Studio, RemotiveBus, Wireshark, examples repo + workspace init. Launch with cpu-options NestedVirtualization=enabled.' \
+  --description "$AMI_DESC" \
   --query 'ImageId' --output text)"
 echo "AMI: $AMI_ID"
 
@@ -115,8 +148,12 @@ log "Waiting for AMI to become available"
 aws ec2 wait image-available --image-ids "$AMI_ID"
 
 aws ec2 create-tags --resources "$AMI_ID" \
-  --tags Key=Name,Value="$AMI_NAME" Key=project,Value=remotive-hackathon >/dev/null || true
+  --tags Key=Name,Value="$AMI_NAME" Key=project,Value=remotive-hackathon Key=arch,Value="$ARCH" >/dev/null || true
 
 log "DONE"
 echo "AMI_ID=$AMI_ID"
-echo "Launch participants with:  --cpu-options NestedVirtualization=enabled"
+if [[ "$ARCH" == "arm64" ]]; then
+  echo "Launch participants on BARE METAL for /dev/kvm:  --instance-type c7g.metal  (no cpu-options)"
+else
+  echo "Launch participants with:  --cpu-options NestedVirtualization=enabled"
+fi

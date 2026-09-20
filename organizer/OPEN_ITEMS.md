@@ -7,6 +7,12 @@ Current day-2 AMI (built 2026-09-19 by `build-ami.sh`, verified clean): **us-eas
 (`remotive-topology-hackathon-day2-20260919-clean`) — SSH-tunnel model, service-account auth,
 Organic Maps APK, CLI 0.34.1, no Docker images pre-pulled.
 
+Current **arm64** AMI (built 2026-09-20 by `build-ami.sh ARCH=arm64`, **not yet launched or
+verified**): **us-east-1 `ami-01837a4e45a10e866`** / **eu-central-1 `ami-05ac1fbdea026b519`**
+(`remotive-topology-hackathon-arm64-20260920-194721`), both public. Optional "Arm on Arm" track,
+needs `c7g.metal` for `/dev/kvm`; Android/Cuttlefish untested on arm64. Details in
+`organizer/ARM64_AMI_BUILD_REPORT.md`. The earlier `ami-0b4c4739e522f410c` is deprecated.
+
 Superseded and **not to be used**: `ami-08de37a4b7b92ca19` (us-east-1) and
 `ami-0ab06933113f68dc2` (eu-central-1), both dated 2026-09-18 and both **public**. They were
 created with `aws ec2 create-image` directly against a working session box rather than by

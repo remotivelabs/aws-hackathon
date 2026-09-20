@@ -22,7 +22,42 @@ secure context and is already in Studio's allow-list.
 | Preinstalled | Docker + Compose, RemotiveCLI 0.34.1 (+ Studio), RemotiveBus, Wireshark, git-lfs, examples repo, map APK |
 | Auth | service account — **no interactive login** (see step 3) |
 | Docker images | **not** pre-pulled — the first `docker compose up` pulls ~7 GB (Cuttlefish), so allow extra time on a first start |
-| Previous AMIs | ~~ami-08de37a4b7b92ca19 (us-east-1)~~, ~~ami-0ab06933113f68dc2 (eu-central-1)~~ — do not use, their examples checkout is polluted with a Part 2 solution |
+| Arm variant | **us-east-1:** `ami-01837a4e45a10e866` / **eu-central-1:** `ami-05ac1fbdea026b519` (remotive-topology-hackathon-arm64-20260920, arm64/aarch64, public) — optional track, **bare metal only**, see below |
+
+### Optional track: Arm on Arm
+
+The default box is x86_64, and it is the supported path. There is also an **arm64 AMI**, and it is
+worth knowing why: **the silicon in a real car is Arm.** Head unit SoCs, most ECU microcontrollers and
+Android Automotive all run on it. Take this track and the host architecture matches the target, so your
+containers and behavioral models are built and exercised for the same instruction set they would ship
+on — Arm on Arm, rather than Arm software cross-built on an Intel host. It is the same seam as
+[RemotiveLabs and Arm on digital twins for next-generation automotive systems](https://www.remotivelabs.com/blog/remotivelabs-showcases-digital-twin-to-accelerate-next-generation-automotive-systems-on-arm):
+validate against a virtual Arm ECU now, swap in the real one when it exists. *(Summarised from that
+post.)*
+
+**It needs a bare metal instance.** Virtualized Graviton does not expose nested virtualization, so
+`/dev/kvm` only exists on metal — launch **`c7g.metal`**. There KVM is native rather than nested, and
+the Cuttlefish image is multi-arch (amd64 + arm64), so Android has a route. Same script, two overrides:
+
+```bash
+# us-east-1
+./participant/start-day2.sh --region us-east-1 \
+  --ami ami-01837a4e45a10e866 --instance-type c7g.metal
+
+# eu-central-1
+./participant/start-day2.sh --region eu-central-1 \
+  --ami ami-05ac1fbdea026b519 --instance-type c7g.metal
+```
+
+Expect a `[warn]` that the instance type does not support nested virtualization — its check only knows
+the `c8i`/`m8i`/`r8i` family, and on metal you do not need the flag. Check `/dev/kvm` in step 7's output
+instead.
+
+Know what you are signing up for: **Android/Cuttlefish is untested on arm64** — treat the head unit as
+the thing you are exploring, not as a given. Everything else is a native arm64 build and installed the
+same way as the x86 image, from the same `provision.sh`: Docker, RemotiveCLI, RemotiveBus, the examples
+repo, the CAN buses, the 3D car, and all of Part 2. `c7g.metal` is 64 vCPU, so it costs more per hour
+than the default `c8i.4xlarge` — stop it when you are done.
 
 ## Prerequisites (on day-1)
 
@@ -48,7 +83,8 @@ secure context and is already in Studio's allow-list.
 
 > ⚠️ **Nested virtualization is required** for Android/Cuttlefish (`/dev/kvm`). It is a
 > launch-time CPU option the console wizard does not expose, so launch via the **CLI** on
-> an 8th-gen Intel type (**c8i / m8i / r8i**).
+> an 8th-gen Intel type (**c8i / m8i / r8i**). The Arm track sidesteps the option entirely:
+> on `c7g.metal` there is no hypervisor underneath, so KVM is simply there.
 
 ## Quick start — one command on day-1
 

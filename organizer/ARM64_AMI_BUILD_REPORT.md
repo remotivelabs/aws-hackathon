@@ -1,8 +1,52 @@
 # ARM64 AMI Build Report
 
+## Current build — 2026-09-20
+
+**Status:** ✅ public in both regions. Built with `organizer/build-ami.sh`, which now takes `ARCH`.
+
+| | |
+|---|---|
+| AMI | **us-east-1:** `ami-01837a4e45a10e866` / **eu-central-1:** `ami-05ac1fbdea026b519` |
+| Name | `remotive-topology-hackathon-arm64-20260920-194721` |
+| Base | Ubuntu 24.04 arm64 `ami-0246d714afcc1d494` (resolved from SSM) |
+| Built on | `c7g.4xlarge` in us-east-1, then `copy-image` to eu-central-1 |
+| Snapshots | `snap-0f8da5f7c6b049dee` (us-east-1) / `snap-04eea9c017f8a162b` (eu-central-1), both public |
+| Size | **13.84 GiB** of real data on a 100 GiB declared root volume — Docker cache is **cold** (`PREPULL_IMAGES` unset, so no Cuttlefish) |
+
+Built from the **same `provision.sh`** as the x86 image, so the two no longer drift. Two changes made
+for this build:
+
+- `build-ami.sh` takes `ARCH=amd64|arm64`. It picks the arch's Ubuntu SSM parameter, defaults the
+  builder to `c7g.4xlarge` for arm64, and **omits `--cpu-options NestedVirtualization=enabled`**, which
+  is Intel-only and fails the `run-instances` call on Graviton. The build needs no KVM itself.
+- `provision.sh` is arch-aware: `kvm_intel` is only written to `modules-load.d` on x86_64 (on arm64 KVM
+  is in-kernel, so listing a module only produces a boot warning). Its required packages were also
+  split out from behind a `|| true`, which previously could hide a base-tooling failure until PART 2.
+
+**Launching:** `c7g.metal`. Virtualized Graviton exposes no nested virtualization, so `/dev/kvm` needs
+bare metal; there KVM is native and no CPU option is needed. Participant-facing instructions are in
+`participant/INSTRUCTIONS.md` § *Optional track: Arm on Arm*.
+
+**Publishing note:** the account has EC2 **Image Block Public Access** at `block-new-sharing` in both
+regions. Publishing = `disable-image-block-public-access`, then `modify-image-attribute` +
+`modify-snapshot-attribute`, then `enable-image-block-public-access` back to `block-new-sharing`.
+Verified re-enabled in both regions after this build.
+
+**Not yet done:** no on-box verification of the new image. Nothing has been launched from it — Docker,
+the CLI, RemotiveBus, the buses and Cuttlefish are all unverified on this build. The content argument is
+that it came from the same provisioning as the working x86 image.
+
+**Superseded:** `ami-0b4c4739e522f410c` (the 2026-09-18 build below) is **deprecated** as of
+2026-09-20T18:17Z — still launchable by ID, hidden from searches. Everything from here down describes
+that first build and is kept for its ARM64 findings, not for its AMI IDs.
+
+---
+
+# First build (2026-09-18, superseded)
+
 **Date:** 2026-09-18  
 **Region:** eu-central-1 (Frankfurt)  
-**Status:** ✅ **AMI AVAILABLE AND PUBLIC**
+**Status:** ⚠️ **DEPRECATED 2026-09-20** — superseded by the build above
 
 ## AMI Details
 

@@ -38,10 +38,14 @@ fi
 # =============================================================================
 log "PART 1: apt update + base packages"
 apt-get update -y
+# Required tooling: must not be swallowed by a `|| true`, or the failure only shows up
+# much later as a missing jq/curl in PART 2.
 apt-get install -y \
-  ca-certificates curl gnupg git jq unzip make socat \
-  cpu-checker qemu-kvm \
-  linux-modules-extra-"$(uname -r)" || true
+  ca-certificates curl gnupg git jq unzip make socat
+# Best-effort extras. qemu-kvm/cpu-checker are x86-flavoured and may be absent or
+# differently named on arm64; the image does not depend on them.
+apt-get install -y cpu-checker qemu-kvm || true
+apt-get install -y linux-modules-extra-"$(uname -r)" || true
 
 log "PART 1: Wireshark (non-interactive, allow non-root capture)"
 # Preseed so the postinst does not open an interactive dialog.
@@ -61,13 +65,15 @@ systemctl enable --now docker || true
 
 log "PART 1: kernel modules for KVM (Cuttlefish) and SocketCAN (RemotiveBus)"
 # These load at runtime on the actual instance; we also persist them for boot.
-cat >/etc/modules-load.d/remotive.conf <<'EOF'
-kvm_intel
-vcan
-vxcan
-can-gw
-EOF
-for m in kvm_intel vcan vxcan can-gw; do modprobe "$m" 2>/dev/null || true; done
+# KVM differs by architecture: x86 needs the kvm_intel module, while on arm64 KVM is
+# built into the kernel and there is no module to load (listing one would only produce a
+# boot warning). SocketCAN modules are the same on both.
+MODULES=(vcan vxcan can-gw)
+if [[ "$(uname -m)" == "x86_64" ]]; then
+  MODULES=(kvm_intel "${MODULES[@]}")
+fi
+printf '%s\n' "${MODULES[@]}" >/etc/modules-load.d/remotive.conf
+for m in "${MODULES[@]}"; do modprobe "$m" 2>/dev/null || true; done
 
 # =============================================================================
 # PART 2 - RemotiveLabs tooling + example content (baked into the final image)

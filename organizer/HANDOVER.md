@@ -107,6 +107,28 @@ nothing pointed the participant at Studio to look at it.
 - No design, frame ID, signal or instance name added anywhere; the LAB hint uses a `<your-name>`
   placeholder. Always-loaded steering untouched, so the clean-box guard is unaffected.
 
+**Also this session — the arm64 "Arm on Arm" track.** `INSTRUCTIONS.md` § *The day-2 AMI* gained an
+optional track, framed on the fact that car silicon is Arm, so Graviton makes host and target match.
+Then the AMI was actually rebuilt for it:
+
+- **`build-ami.sh` takes `ARCH=amd64|arm64`.** x86 behaviour is unchanged. For arm64 it resolves the
+  arm64 Ubuntu SSM parameter, defaults to `c7g.4xlarge`, and drops `--cpu-options
+  NestedVirtualization=enabled` — Intel-only, and it fails the `run-instances` call on Graviton.
+- **`provision.sh` is arch-aware**: `kvm_intel` only on x86_64, and its required packages no longer sit
+  behind a `|| true` that could hide a base-tooling failure until PART 2.
+- **Built and published**: `ami-01837a4e45a10e866` (us-east-1) and `ami-05ac1fbdea026b519`
+  (eu-central-1), same image via `copy-image`, both public with public snapshots. 13.84 GiB of real data,
+  cold Docker cache. The 2026-09-18 `ami-0b4c4739e522f410c` is deprecated.
+- **Publishing needs the account-level guard dropped**: Image Block Public Access was at
+  `block-new-sharing` in both regions; disabled, published, re-enabled, verified back on.
+- **Unverified on purpose** — the organizer chose to skip the on-box check for now. Nothing has been
+  launched from either image. That check is the open item; see `ARM64_AMI_BUILD_REPORT.md`.
+- **One AWS-CLI trap worth keeping**: on the authoring machine `AWS_PROFILE` is not set in fresh shells,
+  so `aws` falls back to a `[default]` profile that uses the newer `aws login` flow and reports
+  *"Your session has expired"* even right after `aws sso login`. Pass
+  `AWS_PROFILE=PowerUserAccess-380142015251` explicitly; it looks exactly like a credential-expiry
+  problem and is not.
+
 ### This session (2026-09-19, sixth) — de-polluted for a participant start
 
 The organizer's brief: the Part 2 feature must not leak into Part 1 or into the material a participant
