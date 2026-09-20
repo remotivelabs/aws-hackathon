@@ -20,6 +20,13 @@ need it running for Part 2 anyway. After that you can jump straight to Part 2 wi
 **Part 2 — Go creative** is where the session is going. A feature to build, every design decision
 yours, no steps to follow. Leave it the time it deserves.
 
+**And beyond that** — inspiration only, nothing required. Is a driver actually in the seat? Are the
+doors closed before the car is allowed to drive off? Add the sensor, decide which ECU owns the
+interlock, and prove it on the bus. Keep pulling that thread and you are no longer extending our car,
+you are designing your own E/E architecture: bring your own DBC, containerise your software, hang a
+real ECU off the bus. [The contract is the database, not what stands behind it](#bring-your-own-ecu) —
+and the CAN traffic here carries real messages.
+
 ## Before you start
 
 - Setup done: you ran `source ~/aws-hackathon/participant/setup-day2.sh` and it printed all `[ok]`
