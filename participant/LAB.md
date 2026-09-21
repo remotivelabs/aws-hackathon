@@ -1190,29 +1190,6 @@ single right answer — two people will solve this differently and both can be r
   pattern is in §1.3) and you can see at a glance whether the ECUs, buses and containers you declared
   are the ones you actually got.
 
-## Ground rules change here
-
-Exercises 1 to 5 were read-only and 6 and 7 came with a revert. **This part writes to the examples
-repo for real.** Work straight on `main` — one box, one branch, nothing to merge — and let `git status`
-in `~/remotivelabs-topology-examples` be your safety net:
-
-```bash
-cd ~/remotivelabs-topology-examples
-git status                                           # clean apart from .remotive/ and remotive.yaml
-```
-
-**This box is disposable.** Nothing in `~/remotivelabs-topology-examples` survives it being rebuilt, so
-if you want to keep what you build, copy it off — a `git diff` mailed to yourself, or a patch saved
-under `~/aws-hackathon/`, is enough:
-
-```bash
-cd ~/remotivelabs-topology-examples
-git diff > ~/aws-hackathon/my-feature.patch          # tracked files you changed
-git status --porcelain | grep '^??'                  # ...and anything new you added
-```
-
-Still one topology per Docker daemon, so `down` whatever is running before you start something else.
-
 ## Getting unstuck
 
 Ask Kiro. It knows this platform: the buses, the databases, which ECU sees what, where the models
@@ -1260,46 +1237,3 @@ A channel's `...` menu then offers three things worth knowing:
 - **Capture channel in Wireshark** — launches Wireshark with a generated RemotiveLabs profile
 - **Open in Signal View** — the frame and signal table for that channel
 - **Live channel preview** — values as they arrive
-
----
-
-## Status of this lab
-
-**Both halves have been walked on the box.** Exercises 1 and 2 are validated on the day-2 AMI, cold
-start included; exercises 3 to 7 were written against a running car and every command in them was
-executed there — frame IDs and rates, the SOME/IP packet decode, the VSS frame IDs, the DBC cycle-time
-change, the single-container model rebuild, the stopped ECU, the SNA fallback and the control-channel
-ping. Part 2 was built end to end on the same box and demonstrated interactively and as a CI test, so
-the brief is known to be solvable in the time available — the implementation was then deliberately
-removed, so a participant starts from a clean car.
-
-**Part 1 is optional and framed as a menu.** The floor is Exercise 1 — the car has to be running for
-Part 2 — and everything after that is take-it-or-leave-it. Do not march a table through exercises 2 to
-7; offer the ones that serve what they are curious about, and point people at Part 2 early. A good
-short subset for someone who wants a taste first is 1, 3 and 6.
-
-Part 2 is a brief, deliberately. It carries the requirements and the hints and nothing else — no
-routing guidance, no frame IDs, no steps — because the design decisions are the exercise. The
-facilitator material for it is **not** in this file: `.kiro/steering/go-creative-coaching.md` is the
-coaching playbook Kiro loads when someone works Part 2 — the decision space with trade-offs, the traps
-that cost real time, verification recipes, and an incremental ladder to offer only to someone with no
-foothold. **Not participant-facing.**
-
-**No worked solution ships with this material.** The feature has been built end to end once, so it is
-known to fit the session, but nothing here holds a finished version and nothing is pre-applied on the
-box. The participant and Kiro build it together, on `main`, in the examples repo.
-
-Facilitator notes:
-
-- The worked dashboard is `~/aws-hackathon/participant/dashboards/drive.dashboard.json` (front and
-  rear video, speed + left indicator chart, frame distribution) for anyone who falls behind.
-- Exercise 6.2 restarts the whole topology on purpose. Recreating a single `<ECU>-broker.com` can
-  take neighbouring brokers down with it (the brokers form a cluster), and a `topology-broker.com`
-  restart drops the recording session — `remotive broker playback status` returns `[]` until
-  `playback` is restarted. Both are written into the exercise as expected behaviour.
-- Exercise 6.3's unit bug is deliberately dramatic (the head unit believes 107 km/h) because it makes
-  the multi-hop encoding chain from exercise 5 tangible. Keep the revert in the same breath.
-- The `3d-car` mapping is served live at `http://localhost:3000/mapping.yaml`, so in-place edits need
-  only a browser reload. But `git checkout` (and editors that save by replacing the file) leave the
-  bind mount pointing at the old inode: the container keeps serving the previous content until
-  `up -d --force-recreate 3d-car`. A plain `restart` does not fix it. Verified both ways on the box.
