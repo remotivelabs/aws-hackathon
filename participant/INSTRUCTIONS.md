@@ -18,11 +18,11 @@ secure context and is already in Studio's allow-list.
 
 | | |
 |---|---|
-| AMI ID | **us-east-1:** `ami-01427a11059a0b23d` / **eu-central-1:** `ami-0ad3d7ef0066987e6` (remotive-topology-hackathon-day2-20260919-clean, x86_64) |
+| AMI ID | **us-west-1:** `ami-0175ecdc439312e2f` (the default) / **us-east-1:** `ami-01427a11059a0b23d` / **eu-central-1:** `ami-0ad3d7ef0066987e6` (remotive-topology-hackathon-day2-20260919-clean, x86_64) |
 | Preinstalled | Docker + Compose, RemotiveCLI 0.34.1 (+ Studio), RemotiveBus, Wireshark, git-lfs, examples repo, map APK |
 | Auth | service account — **no interactive login** (see step 3) |
 | Docker images | **not** pre-pulled — the first `docker compose up` pulls ~7 GB (Cuttlefish), so allow extra time on a first start |
-| Arm variant | **us-east-1:** `ami-01837a4e45a10e866` / **eu-central-1:** `ami-05ac1fbdea026b519` (remotive-topology-hackathon-arm64-20260920, arm64/aarch64, public) — optional track, **bare metal only**, see below |
+| Arm variant | **us-west-1:** `ami-04d85e46b4b3d6623` / **us-east-1:** `ami-01837a4e45a10e866` / **eu-central-1:** `ami-05ac1fbdea026b519` (remotive-topology-hackathon-arm64-20260920, arm64/aarch64, public) — optional track, **bare metal only**, see below |
 
 ### Optional track: Arm on Arm
 
@@ -40,6 +40,10 @@ post.)*
 the Cuttlefish image is multi-arch (amd64 + arm64), so Android has a route. Same script, two overrides:
 
 ```bash
+# us-west-1 (the default region)
+./participant/start-day2.sh --region us-west-1 \
+  --ami ami-04d85e46b4b3d6623 --instance-type c7g.metal
+
 # us-east-1
 ./participant/start-day2.sh --region us-east-1 \
   --ami ami-01837a4e45a10e866 --instance-type c7g.metal
@@ -63,7 +67,7 @@ than the default `c8i.4xlarge` — stop it when you are done.
 
 - AWS CLI configured, and an EC2 **key pair** saved at `~/.ssh/my-key.pem`:
   ```bash
-  aws ec2 create-key-pair --region us-east-1 --key-name my-key \
+  aws ec2 create-key-pair --region us-west-1 --key-name my-key \
     --query KeyMaterial --output text > ~/.ssh/my-key.pem && chmod 600 ~/.ssh/my-key.pem
   ```
   > If `create-key-pair` says the key already exists, either pick a new `--key-name` (and
@@ -116,7 +120,8 @@ steps below do:
 from the Kiro window connected to the box, so that every command lands where the containers, the
 buses and the logs are.
 
-It defaults to **us-east-1**; for Frankfurt use `--region eu-central-1` (it picks that region's AMI).
+It defaults to **us-west-1**; for Virginia use `--region us-east-1` and for Frankfurt
+`--region eu-central-1` (it picks that region's AMI).
 Re-run it whenever you edit this folder on day-1 and want the box to catch up; add `--skip-aws` to
 leave AWS alone. `--help` lists the rest (instance type, key name, instance id, and switches to skip
 the security group, the `~/.ssh/config` edit or the repo refresh).
@@ -134,11 +139,11 @@ The day-2 box only needs inbound **SSH (22)** from day-1. Nothing else is expose
 ```bash
 DAY1_IP=$(curl -s https://checkip.amazonaws.com)   # or the day-1 machine's IP/SG
 
-SG=$(aws ec2 create-security-group --region us-east-1 \
+SG=$(aws ec2 create-security-group --region us-west-1 \
   --group-name remotive-hackathon --description "RemotiveTopology hackathon (SSH only)" \
   --query GroupId --output text)
 
-aws ec2 authorize-security-group-ingress --region us-east-1 \
+aws ec2 authorize-security-group-ingress --region us-west-1 \
   --group-id "$SG" --protocol tcp --port 22 --cidr "${DAY1_IP}/32"
 echo "Security group: $SG"
 ```
@@ -150,6 +155,17 @@ echo "Security group: $SG"
 > a second one.
 
 ```bash
+# For us-west-1 (the default region):
+aws ec2 run-instances --region us-west-1 \
+  --image-id ami-0175ecdc439312e2f \
+  --instance-type c8i.4xlarge \
+  --cpu-options NestedVirtualization=enabled \
+  --key-name my-key \
+  --security-group-ids "$SG" \
+  --block-device-mappings '[{"DeviceName":"/dev/sda1","Ebs":{"VolumeSize":100,"VolumeType":"gp3","DeleteOnTermination":true}}]' \
+  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=remotive-hackathon}]' \
+  --query 'Instances[0].InstanceId' --output text
+
 # For us-east-1:
 aws ec2 run-instances --region us-east-1 \
   --image-id ami-01427a11059a0b23d \
@@ -176,7 +192,7 @@ aws ec2 run-instances --region eu-central-1 \
 Get its IP once running:
 
 ```bash
-aws ec2 describe-instances --region us-east-1 \
+aws ec2 describe-instances --region us-west-1 \
   --filters "Name=tag:Name,Values=remotive-hackathon" "Name=instance-state-name,Values=running" \
   --query 'Reservations[].Instances[].PublicIpAddress' --output text
 ```
@@ -399,7 +415,7 @@ docker compose -f remotive_car/build/remotive_car_android/docker-compose.yml \
   -f remotive_car/instances/android/cuttlefish.compose.yaml \
   --profile playback --profile 3dcar down
 
-aws ec2 terminate-instances --region us-east-1 --instance-ids <INSTANCE_ID>
+aws ec2 terminate-instances --region us-west-1 --instance-ids <INSTANCE_ID>
 ```
 
 ## Troubleshooting

@@ -24,7 +24,7 @@
 # connecting with Remote-SSH — the script prints the exact steps at the end.
 #
 # Options (all optional):
-#   --region <r>          default: $AWS_REGION, else $AWS_DEFAULT_REGION, else us-east-1
+#   --region <r>          default: $AWS_REGION, else $AWS_DEFAULT_REGION, else us-west-1
 #   --ami <id>            override the region's AMI
 #   --instance-type <t>   default c8i.4xlarge (needs c8i/m8i/r8i for Android/KVM)
 #   --key-name <n>        EC2 key pair name, default my-key
@@ -42,7 +42,7 @@
 set -euo pipefail
 
 # ---------------------------------------------------------------------------- defaults
-REGION="${AWS_REGION:-${AWS_DEFAULT_REGION:-us-east-1}}"
+REGION="${AWS_REGION:-${AWS_DEFAULT_REGION:-us-west-1}}"
 AMI_ID=""
 INSTANCE_TYPE="c8i.4xlarge"
 KEY_NAME="my-key"
@@ -77,6 +77,7 @@ usage() { sed -n '2,/^set -euo/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//;$d';
 ami_for_region() {
   # Public day-2 AMI per region — keep in sync with participant/INSTRUCTIONS.md.
   case "$1" in
+    us-west-1)    echo "ami-0175ecdc439312e2f" ;;
     us-east-1)    echo "ami-01427a11059a0b23d" ;;
     eu-central-1) echo "ami-0ad3d7ef0066987e6" ;;
     *)            echo "" ;;
@@ -258,7 +259,8 @@ else
     # ---- nothing there: launch a new one from the AMI ----
     [ -n "$AMI_ID" ] || AMI_ID="$(ami_for_region "$REGION")"
     [ -n "$AMI_ID" ] || die "no published day-2 AMI for region ${REGION}.
-    Use --region us-east-1 or --region eu-central-1, or pass --ami <id> if you copied the image."
+    Use --region us-west-1, --region us-east-1 or --region eu-central-1, or pass --ami <id>
+    if you copied the image."
 
     aws_ec2 describe-key-pairs --key-names "$KEY_NAME" >/dev/null 2>&1 \
       || die "EC2 key pair '${KEY_NAME}' does not exist in ${REGION}.

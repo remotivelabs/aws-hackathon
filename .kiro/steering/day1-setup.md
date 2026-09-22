@@ -68,7 +68,8 @@ Do not re-litigate these in chat, and do not invent your own AWS commands — sa
 | Question | Settled as |
 |---|---|
 | "start the AMI" — launch a new box, or start an existing one? | Whatever is cheapest and least destructive: an instance tagged `Name=remotive-hackathon` that is **running** is reused as-is; a **stopped** one is started (its disk, and any work on it, survives); only if there is none does it launch a new one from the AMI. Two or more matches is an error, not a guess — it asks for `--instance-id`. |
-| Which AMI? | Picked from the region: `us-east-1` → `ami-01427a11059a0b23d`, `eu-central-1` → `ami-0ad3d7ef0066987e6`. Any other region is an error with the two valid ones named, not a silent fallback. |
+| Which region? | **`us-west-1` is the default** (overridable with `--region`, `$AWS_REGION` or `$AWS_DEFAULT_REGION`). |
+| Which AMI? | Picked from the region: `us-west-1` → `ami-0175ecdc439312e2f`, `us-east-1` → `ami-01427a11059a0b23d`, `eu-central-1` → `ami-0ad3d7ef0066987e6`. Any other region is an error with the three valid ones named, not a silent fallback. The arm64 variant is not in that table — it is passed with `--ami` (`us-west-1` → `ami-04d85e46b4b3d6623`). |
 | Nested virtualization | Added automatically on `c8i`/`m8i`/`r8i` (needed for `/dev/kvm`, i.e. Android). Any other type gets a warning, not a failure — Part 2 does not need Android. |
 | Where does the folder land? | `~/aws-hackathon` on the box, via `rsync -a --exclude .git`. The path matters: `setup-day2.sh` derives its symlinks from its own location. |
 | Where does auth come from? | `participant/setup-day2.sh`, run on the box, which sources `remotive-auth` → `participant/service-account.json` → `REMOTIVE_CLOUD_AUTH_TOKEN` in `~/.ssh/environment`. Never `remotive cloud auth login`. |

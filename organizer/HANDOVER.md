@@ -1,7 +1,46 @@
 # Lab authoring — worklog and handover
 
-Last updated 2026-09-19 (sixth session). Read this before continuing work on `participant/LAB.md` or
+Last updated 2026-09-21 (seventh session). Read this before continuing work on `participant/LAB.md` or
 the steering files — it is organizer-facing, and nothing in a participant session needs it.
+
+## Seventh session, 2026-09-21 — us-west-1 is the default region
+
+**Both AMIs now exist and are public in three regions**, and `us-west-1` is what day-1 launches into
+unless told otherwise.
+
+- **Copied us-east-1 → us-west-1** and published both: x86_64 `ami-0175ecdc439312e2f`
+  (`remotive-topology-hackathon-day2-20260919-clean`) and arm64 `ami-04d85e46b4b3d6623`
+  (`remotive-topology-hackathon-arm64-20260920-194721`). Snapshots `snap-09b76085cb9152385` and
+  `snap-042afce1e599fe298` are public too — an AMI without a public snapshot cannot actually be
+  launched by anyone else.
+- **The guardrail is per-region, and that is the trap.** `ImageBlockPublicAccess` was
+  `block-new-sharing` in all three regions, so `modify-image-attribute` failed with
+  `OperationNotPermitted` until it was disabled in us-west-1. Disabled, published, re-enabled —
+  the dance already written down in `OPEN_ITEMS.md` §1, now confirmed a second time. All three
+  regions verified back at `block-new-sharing`. Note the existing public AMIs in us-east-1 and
+  eu-central-1 predate the setting; it only blocks *new* sharing, which is why they stayed public.
+- **Key pairs are regional, and this bites the region default.** `my-key` did not exist in
+  us-west-1, so the new default would have died at `run-instances`. The public half of the
+  existing `~/.ssh/my-key.pem` was imported there; the imported-style (MD5-of-DER-pubkey)
+  fingerprint `1e:3b:78:…:74` now matches in both eu-central-1 and us-west-1, so one private key
+  works everywhere. Added as step 3 of the `OPEN_ITEMS.md` §1 recipe.
+- **Instance types checked, not assumed.** us-west-1 offers `c8i.4xlarge` (x86 default, nested
+  virt for Android) and `c7g.metal` (the Arm-on-Arm track), so neither path loses a region.
+- **Files changed:** `participant/start-day2.sh` (default region, `ami_for_region`, the
+  no-AMI-for-region error), `participant/INSTRUCTIONS.md` (AMI table, Arm overrides, the
+  "defaults to" sentence, and the manual-equivalent steps 1–2 plus the teardown command),
+  `.kiro/steering/day1-setup.md` (a new "Which region?" row and the AMI row),
+  `organizer/OPEN_ITEMS.md` (current-AMI header, §1 turned from a flag into a reusable recipe,
+  §3 guardrail note) and `organizer/ARM64_AMI_BUILD_REPORT.md` (region rows).
+- **Verified:** `bash -n` on the script, `ami_for_region us-west-1` returns the new ID, and
+  `describe-images` shows `Public=True` for both copies.
+
+Also this session, unrelated to regions: `LAB.md` lost its trailing `Status of this lab` section
+**and** the `Ground rules change here` section that preceded *Getting unstuck* (commit `f9888bb`).
+The status section was facilitator prose duplicated elsewhere, but the ground-rules section was
+**participant-facing** and carried the only instruction telling a participant to copy work off the
+ephemeral box (`git diff > ~/aws-hackathon/my-feature.patch`) and that one topology runs per Docker
+daemon. Those two facts are now in no participant document — worth restoring in the Part 2 opener.
 
 ## Current state
 

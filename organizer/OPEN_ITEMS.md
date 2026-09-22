@@ -2,16 +2,23 @@
 
 Follow-ups flagged during setup of the hackathon AMI. None are blocking.
 
-Current day-2 AMI (built 2026-09-19 by `build-ami.sh`, verified clean): **us-east-1
+Current day-2 AMI (built 2026-09-19 by `build-ami.sh`, verified clean): **us-west-1
+`ami-0175ecdc439312e2f`** (the script's default region) / **us-east-1
 `ami-01427a11059a0b23d`** / **eu-central-1 `ami-0ad3d7ef0066987e6`**
 (`remotive-topology-hackathon-day2-20260919-clean`) — SSH-tunnel model, service-account auth,
 Organic Maps APK, CLI 0.34.1, no Docker images pre-pulled.
 
 Current **arm64** AMI (built 2026-09-20 by `build-ami.sh ARCH=arm64`, **not yet launched or
-verified**): **us-east-1 `ami-01837a4e45a10e866`** / **eu-central-1 `ami-05ac1fbdea026b519`**
-(`remotive-topology-hackathon-arm64-20260920-194721`), both public. Optional "Arm on Arm" track,
+verified**): **us-west-1 `ami-04d85e46b4b3d6623`** / **us-east-1 `ami-01837a4e45a10e866`** /
+**eu-central-1 `ami-05ac1fbdea026b519`**
+(`remotive-topology-hackathon-arm64-20260920-194721`), all public. Optional "Arm on Arm" track,
 needs `c7g.metal` for `/dev/kvm`; Android/Cuttlefish untested on arm64. Details in
 `organizer/ARM64_AMI_BUILD_REPORT.md`. The earlier `ami-0b4c4739e522f410c` is deprecated.
+
+The us-west-1 pair was copied from us-east-1 on 2026-09-21 and published with the guardrail
+dance in §1 below (snapshots `snap-09b76085cb9152385` x86_64 and `snap-042afce1e599fe298` arm64,
+both public; `ImageBlockPublicAccess` back to `block-new-sharing` afterwards). Key pair `my-key`
+was imported into us-west-1 so the same private key works in all three regions.
 
 Superseded and **not to be used**: `ami-08de37a4b7b92ca19` (us-east-1) and
 `ami-0ab06933113f68dc2` (eu-central-1), both dated 2026-09-18 and both **public**. They were
@@ -67,17 +74,20 @@ When it lands, do this:
    and the MOTD (keep `ssh_config`'s `LocalForward` as a convenience/fallback), and
    present `http://<PUBLIC_IP>:57123` as the primary Studio endpoint.
 
-## 1. Multi-region availability of the AMI (main flag)
+## 1. Multi-region availability of the AMI (recipe, kept for reuse)
 
-The AMI is public **only in us-east-1**. Participants in other regions cannot launch it
-directly. To support other regions, for each target region:
+Now done for **us-west-1** (default), **us-east-1** and **eu-central-1**, x86_64 and arm64 — see
+the AMI IDs at the top of this file. The recipe below is what was run and is what to repeat for
+any further region. To support a new region:
 
-1. Copy the AMI:
+1. Copy the AMI (keep the source `--name` so the image is recognisable across regions):
    ```bash
    aws ec2 copy-image --region <TARGET_REGION> \
-     --source-region us-east-1 --source-image-id ami-06e937b77ab62ac63 \
-     --name remotive-topology-hackathon
+     --source-region us-east-1 --source-image-id ami-01427a11059a0b23d \
+     --name remotive-topology-hackathon-day2-20260919-clean
    ```
+   A 100 GB cross-region copy takes roughly 5–20 minutes; poll `describe-images` for
+   `State=available` rather than assuming.
 2. Wait until the copy is `available`, then make the copy AND its snapshot public
    (the account guardrail `block-new-sharing` must be temporarily disabled in that region
    first, then re-enabled — same dance as us-east-1):
@@ -91,9 +101,17 @@ directly. To support other regions, for each target region:
    aws ec2 enable-image-block-public-access --region <TARGET_REGION> \
      --image-block-public-access-state block-new-sharing
    ```
-3. Add the new region + AMI ID to `participant/INSTRUCTIONS.md`.
-
-Decide which regions to support and I can run this for each.
+3. Import the `my-key` key pair into the region — key pairs are **regional**, so the same
+   `~/.ssh/my-key.pem` is otherwise rejected and `start-day2.sh` dies at the launch step:
+   ```bash
+   ssh-keygen -y -f ~/.ssh/my-key.pem > /tmp/my-key.pub
+   aws ec2 import-key-pair --region <TARGET_REGION> --key-name my-key \
+     --public-key-material fileb:///tmp/my-key.pub
+   ```
+4. Check the instance types exist there. `us-west-1` has `c8i.4xlarge` and `c7g.metal`, but not
+   every region does — `describe-instance-type-offerings` before promising a region.
+5. Add the new region + AMI ID to `participant/start-day2.sh` (`ami_for_region`),
+   `participant/INSTRUCTIONS.md` and `.kiro/steering/day1-setup.md`.
 
 ## 2. Nested virtualization is CLI-only (usability)
 
@@ -106,9 +124,12 @@ Options to smooth this for participants:
 
 ## 3. Account guardrail note (informational)
 
-`ImageBlockPublicAccess` was toggled off then back **on** (`block-new-sharing`) in us-east-1
-to publish the AMI. It is currently re-enabled. The existing public AMI stays public; the
-guardrail only blocks *new* public sharing. No action needed unless publishing more AMIs.
+`ImageBlockPublicAccess` was toggled off then back **on** (`block-new-sharing`) in us-east-1,
+and again in us-west-1 on 2026-09-21, to publish the AMIs. It is currently re-enabled in
+us-east-1, eu-central-1 and us-west-1 — verified. The existing public AMIs stay public; the
+guardrail only blocks *new* public sharing. No action needed unless publishing more AMIs, and
+the toggle is per-region, so a new region will refuse `modify-image-attribute` with
+`OperationNotPermitted` until it is disabled there.
 
 ## 4. Leftover resources / cost (housekeeping)
 

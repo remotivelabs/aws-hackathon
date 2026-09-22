@@ -6,11 +6,11 @@
 
 | | |
 |---|---|
-| AMI | **us-east-1:** `ami-01837a4e45a10e866` / **eu-central-1:** `ami-05ac1fbdea026b519` |
+| AMI | **us-west-1:** `ami-04d85e46b4b3d6623` / **us-east-1:** `ami-01837a4e45a10e866` / **eu-central-1:** `ami-05ac1fbdea026b519` |
 | Name | `remotive-topology-hackathon-arm64-20260920-194721` |
 | Base | Ubuntu 24.04 arm64 `ami-0246d714afcc1d494` (resolved from SSM) |
-| Built on | `c7g.4xlarge` in us-east-1, then `copy-image` to eu-central-1 |
-| Snapshots | `snap-0f8da5f7c6b049dee` (us-east-1) / `snap-04eea9c017f8a162b` (eu-central-1), both public |
+| Built on | `c7g.4xlarge` in us-east-1, then `copy-image` to eu-central-1 and (2026-09-21) us-west-1 |
+| Snapshots | `snap-0f8da5f7c6b049dee` (us-east-1) / `snap-04eea9c017f8a162b` (eu-central-1) / `snap-042afce1e599fe298` (us-west-1), all public |
 | Size | **13.84 GiB** of real data on a 100 GiB declared root volume — Docker cache is **cold** (`PREPULL_IMAGES` unset, so no Cuttlefish) |
 
 Built from the **same `provision.sh`** as the x86 image, so the two no longer drift. Two changes made
